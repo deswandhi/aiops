@@ -27,6 +27,8 @@ The nested Compose files are preserved as source references. Use the root `compo
 
 The current VM uses `compose.deployment.yaml` with the root Compose file. It reuses the original Grafana, Tempo, Loki, Prometheus, and CmdStan volumes, and connects to the existing external ClickHouse database through values in the ignored `.env` file. It also names the existing Python images so the cutover does not depend on rebuilding their large dependency sets. The frontend image is built from `portal/frontend/` in this repo.
 
+The deployment overlay runs Caddy on ports 80 and 443. Its `Caddyfile` routes `https://aiops.iohtechco.com` to the portal and `https://grafana.aiops.iohtechco.com` to Grafana. Caddy obtains and renews the certificates automatically; its certificate data is stored in the `aiops_caddy-data` Docker volume. Both DNS names must point to this VM, and ports 80 and 443 must remain reachable for certificate renewal.
+
 ```bash
 docker compose -f compose.yaml -f compose.deployment.yaml ps
 docker compose -f compose.yaml -f compose.deployment.yaml up -d --no-build

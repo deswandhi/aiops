@@ -1,0 +1,9 @@
+aiops.iohtechco.com {
+    encode zstd gzip
+    reverse_proxy aiops-frontend:80
+}
+
+grafana.aiops.iohtechco.com {
+    encode zstd gzip
+    reverse_proxy grafana:3000
+}

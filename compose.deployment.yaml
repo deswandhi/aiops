@@ -1,7 +1,29 @@
 # Reuse the data from the two original Compose projects on this host.
 services:
+  proxy:
+    image: caddy:2.10.2
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - aiops-frontend
+      - grafana
+    restart: unless-stopped
+    networks:
+      - demo-net
+
   clickhouse:
     profiles: [local-db]
+
+  grafana:
+    environment:
+      GF_SERVER_DOMAIN: grafana.aiops.iohtechco.com
+      GF_SERVER_ROOT_URL: https://grafana.aiops.iohtechco.com/
 
   order-service:
     image: grafana-otel-demo-order-service:latest
@@ -15,6 +37,8 @@ services:
     image: web-portal-for-grafana-otel-demo-aiops-backend:latest
 
 volumes:
+  caddy-data:
+  caddy-config:
   tempo-data:
     external: true
     name: grafana-otel-demo_tempo-data
