@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>AIOps Platform — Architecture, HLD &amp; LLD</title>
+  <style>
+    :root{--ink:#172033;--muted:#5d6a7c;--line:#dce4ed;--paper:#fff;--bg:#f3f6fa;--navy:#12213a;--blue:#1556a8;--teal:#087f77;--amber:#a45a08;--red:#a43237;--soft:#e9f2fc}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 Inter,Arial,sans-serif}
+    a{color:var(--blue)}a:hover{text-decoration:none}.shell{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:100vh}
+    nav{position:sticky;top:0;height:100vh;overflow:auto;background:var(--navy);padding:28px 20px;color:#e9f1fb}
+    nav .brand{font-weight:800;font-size:19px;letter-spacing:.02em;margin-bottom:8px}nav .sub{font-size:12px;color:#a7bed8;margin-bottom:28px}
+    nav a{display:block;color:#d8e6f7;text-decoration:none;padding:7px 10px;border-radius:7px;font-size:13px}nav a:hover{background:#223956}
+    nav .group{color:#7ea9d8;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;margin:20px 10px 5px}
+    main{max-width:1200px;padding:38px 42px 90px;width:100%}.hero{background:linear-gradient(135deg,#132642,#194d77);color:white;padding:42px;border-radius:18px;box-shadow:0 12px 30px #152b4c17}
+    .eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:#a9d6ef}.hero h1{font-size:40px;line-height:1.13;margin:12px 0}.hero p{max-width:780px;color:#d8e9f6;margin:0}
+    .meta{display:flex;flex-wrap:wrap;gap:10px;margin-top:24px}.pill{display:inline-block;background:#ffffff1e;border:1px solid #ffffff40;border-radius:999px;padding:5px 12px;font-size:12px}
+    section{scroll-margin-top:20px;margin-top:44px}h2{font-size:28px;margin:0 0 12px;letter-spacing:-.03em}h3{font-size:19px;margin:24px 0 10px}h4{font-size:15px;margin:16px 0 6px}
+    p{margin:8px 0 14px}.lead{color:var(--muted);font-size:17px}.card{background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:22px;margin:16px 0;box-shadow:0 2px 8px #17203308}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px}.grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}.grid .card{margin:0}
+    .kicker{font-size:11px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--teal)}.card h3{margin:6px 0}.card p:last-child{margin-bottom:0}
+    .note{border-left:4px solid var(--blue);background:var(--soft);padding:14px 18px;border-radius:0 8px 8px 0;margin:18px 0}.note.warn{border-color:var(--amber);background:#fff6e8}.note.risk{border-color:var(--red);background:#fff0f0}
+    .table-wrap{overflow-x:auto;background:white;border:1px solid var(--line);border-radius:12px;margin:16px 0}table{border-collapse:collapse;width:100%;min-width:620px;font-size:13px}th,td{text-align:left;vertical-align:top;border-bottom:1px solid var(--line);padding:11px 13px}th{background:#eaf0f7;color:#28405e;font-size:12px;text-transform:uppercase;letter-spacing:.04em}tr:last-child td{border-bottom:0}
+    code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:.9em;background:#edf2f7;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}pre{overflow:auto;background:#14233a;color:#eaf3ff;padding:16px;border-radius:10px;font-size:12px;line-height:1.5}pre code{background:none;color:inherit;padding:0}
+    .diagram{background:white;border:1px solid var(--line);border-radius:14px;padding:16px;overflow:auto;margin:18px 0}.diagram svg{display:block;width:100%;min-width:780px;height:auto}
+    .flow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:18px 0}.flow .step{background:#fff;border:1px solid var(--line);border-radius:10px;padding:14px;font-size:13px}.step b{display:block;color:var(--blue);font-size:12px;margin-bottom:5px}.step:not(:last-child)::after{content:"→";float:right;color:var(--teal);font-size:20px}
+    details{background:white;border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:10px 0}summary{cursor:pointer;font-weight:700}ul,ol{padding-left:23px}li{margin:4px 0}.small{font-size:12px;color:var(--muted)}.tag{font-size:11px;padding:3px 8px;border-radius:999px;background:#dff3ed;color:#076659;font-weight:700;white-space:nowrap}.tag.external{background:#fff0d8;color:#885208}.tag.risk{background:#ffe5e5;color:#993539}
+    .footer{border-top:1px solid var(--line);margin-top:45px;padding-top:18px;color:var(--muted);font-size:12px}
+    @media(max-width:950px){.shell{display:block}nav{position:relative;height:auto}nav .links{display:grid;grid-template-columns:repeat(2,1fr)}main{padding:22px}.grid,.grid.three{grid-template-columns:1fr}.flow{grid-template-columns:1fr 1fr}.hero{padding:27px}.hero h1{font-size:31px}}
+    @media print{nav{display:none}.shell{display:block}main{max-width:none;padding:0}.hero{box-shadow:none}section{break-inside:avoid}.card,.table-wrap,.diagram{box-shadow:none}a{color:inherit;text-decoration:none}}
+  </style>
+</head>
+<body>
+<div class="shell">
+  <nav aria-label="Document navigation">
+    <div class="brand">AIOps Architecture</div><div class="sub">Current deployment · HLD · LLD</div>
+    <div class="links">
+      <div class="group">Overview</div>
+      <a href="#scope">Scope &amp; status</a><a href="#context">System context</a><a href="#hld">High-level design</a><a href="#flows">Data flows</a>
+      <div class="group">Detailed design</div>
+      <a href="#deployment">Deployment topology</a><a href="#components">Component inventory</a><a href="#api">API contract</a><a href="#analytics">Analytics internals</a><a href="#data">Data model &amp; storage</a>
+      <div class="group">Operations</div>
+      <a href="#security">Security &amp; trust</a><a href="#operations">Operations &amp; recovery</a><a href="#limits">Limits &amp; future work</a><a href="#sources">Source map</a>
+    </div>
+  </nav>
+  <main>
+    <header class="hero">
+      <div class="eyebrow">Architecture specification · current state</div>
+      <h1>AIOps Observability Platform</h1>
+      <p>Architecture, high-level design (HLD), and low-level design (LLD) for the deployed demo and AIOps portal. This document describes the running implementation in the <code>aiops</code> repository, including its host-specific deployment overlay.</p>
+      <div class="meta"><span class="pill">1 VM · Docker Compose</span><span class="pill">15 containers</span><span class="pill">OpenTelemetry + Grafana</span><span class="pill">ClickHouse analytics</span><span class="pill">HTTPS via Caddy</span></div>
+    </header>
+
+    <section id="scope">
+      <h2>1. Scope and status</h2>
+      <p class="lead">The system generates e-commerce traffic, collects telemetry, presents it in Grafana, and analyzes it in a separate AIOps portal.</p>
+      <div class="grid three">
+        <div class="card"><div class="kicker">Public interface</div><h3>AIOps portal</h3><p><a href="https://aiops.iohtechco.com/">aiops.iohtechco.com</a> serves the static Next.js UI and proxies <code>/api/*</code> to FastAPI.</p></div>
+        <div class="card"><div class="kicker">Public interface</div><h3>Grafana</h3><p><a href="https://grafana.aiops.iohtechco.com/">grafana.aiops.iohtechco.com</a> presents provisioned dashboards, metrics, logs, and traces.</p></div>
+        <div class="card"><div class="kicker">Deployment mode</div><h3>Existing host</h3><p>The production overlay uses an external ClickHouse instance and preserved Docker volumes from the previous two Compose projects.</p></div>
+      </div>
+      <div class="note"><strong>Scope boundary.</strong> This is a demo-specific platform. The AIOps queries are coupled to the <code>otel</code> schema, specific service names, and order/payment/inventory metrics. A generic multi-source or multi-tenant AIOps platform has not yet been implemented.</div>
+    </section>
+
+    <section id="context">
+      <h2>2. System context</h2>
+      <div class="diagram" role="img" aria-label="System context diagram">
+        <svg viewBox="0 0 1060 370" xmlns="http://www.w3.org/2000/svg">
+          <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L8 4 L0 8 Z" fill="#64839e"/></marker></defs>
+          <rect x="15" y="55" width="170" height="72" rx="12" fill="#e8f1fa" stroke="#8db4d7"/><text x="100" y="84" text-anchor="middle" font-weight="700" fill="#183659">Engineer / browser</text><text x="100" y="105" text-anchor="middle" font-size="12" fill="#58718b">HTTPS 443</text>
+          <rect x="15" y="237" width="170" height="72" rx="12" fill="#e7f6f2" stroke="#92cabb"/><text x="100" y="266" text-anchor="middle" font-weight="700" fill="#164b44">Load generator</text><text x="100" y="287" text-anchor="middle" font-size="12" fill="#42786d">Simulated orders</text>
+          <rect x="240" y="40" width="765" height="288" rx="20" fill="#f7fafc" stroke="#b9cddd" stroke-dasharray="7 6"/><text x="265" y="66" font-weight="700" fill="#42607d">AIOps VM · Docker Compose network</text>
+          <rect x="285" y="88" width="150" height="65" rx="10" fill="#173f68"/><text x="360" y="116" text-anchor="middle" font-weight="700" fill="white">Caddy</text><text x="360" y="137" text-anchor="middle" font-size="12" fill="#cfe5f5">TLS + routing</text>
+          <rect x="485" y="78" width="150" height="67" rx="10" fill="#2d6287"/><text x="560" y="106" text-anchor="middle" font-weight="700" fill="white">Portal</text><text x="560" y="127" text-anchor="middle" font-size="12" fill="#e4f4ff">Nginx + FastAPI</text>
+          <rect x="700" y="78" width="150" height="67" rx="10" fill="#2d6287"/><text x="775" y="106" text-anchor="middle" font-weight="700" fill="white">Grafana</text><text x="775" y="127" text-anchor="middle" font-size="12" fill="#e4f4ff">Explore + dashboard</text>
+          <rect x="285" y="223" width="150" height="65" rx="10" fill="#14776c"/><text x="360" y="251" text-anchor="middle" font-weight="700" fill="white">Demo services</text><text x="360" y="272" text-anchor="middle" font-size="12" fill="#d6f7ef">Order · Inventory · Pay</text>
+          <rect x="495" y="223" width="145" height="65" rx="10" fill="#14776c"/><text x="568" y="251" text-anchor="middle" font-weight="700" fill="white">OTel Collector</text><text x="568" y="272" text-anchor="middle" font-size="12" fill="#d6f7ef">traces · metrics · logs</text>
+          <rect x="705" y="207" width="245" height="96" rx="10" fill="#e4eef8" stroke="#91b1cf"/><text x="827" y="235" text-anchor="middle" font-weight="700" fill="#204367">Grafana data stores</text><text x="827" y="257" text-anchor="middle" font-size="12" fill="#42617e">Tempo · Prometheus · Loki</text><text x="827" y="278" text-anchor="middle" font-size="12" fill="#42617e">preserved Docker volumes</text>
+          <rect x="858" y="76" width="128" height="68" rx="10" fill="#fff0d8" stroke="#d4b269"/><text x="922" y="105" text-anchor="middle" font-weight="700" fill="#714d14">Gemini API</text><text x="922" y="126" text-anchor="middle" font-size="12" fill="#936d2f">external</text>
+          <rect x="858" y="325" width="145" height="40" rx="10" fill="#fff0d8" stroke="#d4b269"/><text x="930" y="350" text-anchor="middle" font-weight="700" fill="#714d14">ClickHouse · external</text>
+          <path d="M185 91 H284" stroke="#64839e" stroke-width="2" marker-end="url(#arrow)"/><path d="M435 105 H484 M435 123 H699" stroke="#64839e" stroke-width="2" marker-end="url(#arrow)"/>
+          <path d="M185 273 H284 M435 255 H494 M640 255 H704" stroke="#64839e" stroke-width="2" marker-end="url(#arrow)"/>
+          <path d="M560 145 V206 H820 V208 M775 145 V205" stroke="#64839e" stroke-width="2" marker-end="url(#arrow)"/>
+          <path d="M640 280 V344 H857 M560 145 V182 H960 V144" stroke="#64839e" stroke-width="2" marker-end="url(#arrow)"/>
+        </svg>
+      </div>
+      <p class="small">Logical arrows show the main relationships; exact protocol and port assignments appear below. ClickHouse and Gemini are outside the VM Compose network in the current deployment.</p>
+    </section>
+
+    <section id="hld">
+      <h2>3. High-level design (HLD)</h2>
+      <div class="grid">
+        <div class="card"><div class="kicker">Presentation plane</div><h3>Portal and Grafana</h3><p>Caddy terminates HTTPS and routes by hostname. The portal's Nginx serves exported Next.js files and forwards <code>/api/</code> to FastAPI. Grafana queries its provisioned Tempo, Prometheus, and Loki data sources.</p></div>
+        <div class="card"><div class="kicker">Workload plane</div><h3>Demo transaction path</h3><p>The load generator calls Order. Order calls Inventory and Payment, then writes successful orders to PostgreSQL. Inventory caches simulated stock in Redis. Payment includes deliberate and random failure scenarios.</p></div>
+        <div class="card"><div class="kicker">Telemetry plane</div><h3>Collection and storage</h3><p>Instrumented services export OTLP to the Collector. It fans out traces to Tempo and ClickHouse, metrics to a Prometheus scrape endpoint and ClickHouse, and logs to Loki and ClickHouse. Node Exporter is scraped by the Collector.</p></div>
+        <div class="card"><div class="kicker">Intelligence plane</div><h3>AIOps analysis</h3><p>FastAPI reads ClickHouse over HTTP to compute forecasts, anomaly timelines, log templates, trace shapes, service dependencies, and cross-signal views. Chat and incident summaries call Gemini when configured.</p></div>
+      </div>
+      <h3>Design decisions visible in the implementation</h3>
+      <ul>
+        <li>One Docker Compose project and one bridge network connect the VM services; no Kubernetes, message broker, or separate API gateway is present.</li>
+        <li>Grafana is a visualization path; the AIOps portal reads ClickHouse directly and does not query Grafana's API for analytics.</li>
+        <li>The frontend is statically exported at build time and served by Nginx. Browser API calls use relative <code>/api</code> paths, so the same HTTPS origin serves UI and API.</li>
+        <li>The host deployment keeps historic Tempo, Prometheus, Loki, Grafana, and CmdStan volumes. A local-only Compose mode can instead start the repository's ClickHouse service.</li>
+      </ul>
+    </section>
+
+    <section id="flows">
+      <h2>4. End-to-end data flows</h2>
+      <h3>4.1 Order and telemetry sequence</h3>
+      <div class="flow"><div class="step"><b>1 · Trigger</b>Load generator or client sends <code>POST /orders</code>.</div><div class="step"><b>2 · Inventory</b>Order calls <code>GET /stock/{item_id}</code>; Inventory checks Redis and simulated stock.</div><div class="step"><b>3 · Payment</b>Order calls <code>POST /charge</code>; Payment may accept or reject.</div><div class="step"><b>4 · Persist</b>Successful orders are stored in PostgreSQL.</div><div class="step"><b>5 · Observe</b>Spans, logs, and metrics reach the Collector and fan out to stores.</div></div>
+      <p>OpenTelemetry trace context follows the HTTP calls. Manual spans mark inventory lookup, payment, and order database steps. Trace IDs also appear in logs, enabling log-to-trace navigation in Grafana.</p>
+      <h3>4.2 Grafana query path</h3>
+      <p>Browser → Caddy → Grafana. Grafana queries Prometheus for metrics, Loki for logs, and Tempo for traces. Provisioned data-source links connect related logs, traces, and metrics. Tempo's metrics generator writes span and service-graph metrics to Prometheus remote write.</p>
+      <h3>4.3 AIOps query path</h3>
+      <p>Browser → Caddy → frontend Nginx <code>/api/</code> → FastAPI router → ClickHouse <code>otel</code> tables → JSON result → portal component. Forecast and anomaly requests run models synchronously in the API process. Health checks run <code>SELECT 1</code> against ClickHouse.</p>
+      <h3>4.4 AI request path</h3>
+      <p>For chat, FastAPI sends a schema-aware prompt and recent conversation to Gemini 2.5 Flash. If the model returns a SQL <code>SELECT</code>, the backend executes it against ClickHouse and can send a small result subset back to Gemini for interpretation. For incident summaries, FastAPI first gathers errors, slow spans, logs, and metric totals, then sends that context to Gemini.</p>
+    </section>
+
+    <section id="deployment">
+      <h2>5. Deployment topology</h2>
+      <div class="table-wrap"><table><thead><tr><th>Boundary</th><th>Implementation</th><th>Address / protocol</th><th>Persistence</th></tr></thead><tbody>
+        <tr><td>Public portal</td><td>Caddy → Nginx frontend</td><td><code>aiops.iohtechco.com:443</code> → <code>aiops-frontend:80</code></td><td>Caddy certificate volume</td></tr>
+        <tr><td>Public Grafana</td><td>Caddy → Grafana</td><td><code>grafana.aiops.iohtechco.com:443</code> → <code>grafana:3000</code></td><td>Existing Grafana volume</td></tr>
+        <tr><td>Portal API</td><td>Nginx → FastAPI</td><td><code>/api/*</code> → <code>aiops-backend:8080</code></td><td>Stateless API; CmdStan cache volume</td></tr>
+        <tr><td>Telemetry ingest</td><td>OpenTelemetry Collector</td><td>OTLP gRPC <code>4317</code>; OTLP HTTP <code>4318</code></td><td>External ClickHouse and local stores</td></tr>
+        <tr><td>External analytics database</td><td>Existing ClickHouse instance</td><td>Backend HTTP <code>8123</code>; Collector native TCP <code>9000</code></td><td>Outside this Compose project</td></tr>
+        <tr><td>Outbound AI</td><td>Google Gemini API</td><td>HTTPS to <code>generativelanguage.googleapis.com</code></td><td>Request-time external dependency</td></tr>
+      </tbody></table></div>
+      <p>The VM publishes the legacy direct ports <code>3000</code>, <code>3001</code>, <code>8080</code>, <code>8000–8002</code>, <code>3100</code>, <code>3200</code>, <code>9090</code>, <code>4317–4318</code>, and <code>8888</code>. Caddy publishes TCP <code>80</code>/<code>443</code> and UDP <code>443</code>. Internal names resolve on the Compose <code>demo-net</code> bridge network.</p>
+      <div class="note warn"><strong>Deployment distinction.</strong> <code>compose.yaml</code> alone starts a local ClickHouse service and new volumes. <code>compose.yaml</code> plus <code>compose.deployment.yaml</code> excludes local ClickHouse, reuses historic volumes, adds Caddy, and references the existing working Python images. The frontend image was built from this repository.</div>
+    </section>
+
+    <section id="components">
+      <h2>6. Component inventory (LLD)</h2>
+      <div class="table-wrap"><table><thead><tr><th>Container / module</th><th>Responsibility and implementation</th><th>Ports / dependencies</th></tr></thead><tbody>
+        <tr><td><code>proxy</code></td><td>Caddy 2.10.2; host routing, TLS issuance and renewal, HTTP redirect</td><td>80, 443/TCP, 443/UDP → frontend, Grafana</td></tr>
+        <tr><td><code>aiops-frontend</code></td><td>Next.js 16 static export served by Nginx; UI components for predictive, detective, diagnostic, and chat views</td><td>Host 3001 → container 80; <code>/api/</code> → backend</td></tr>
+        <tr><td><code>aiops-backend</code></td><td>FastAPI 0.110; ClickHouse client, pandas/Prophet/scikit-learn/Drain3, Gemini requests</td><td>8080; ClickHouse 8123; Gemini HTTPS</td></tr>
+        <tr><td><code>order-service</code></td><td>FastAPI order API; traces and business metrics; PostgreSQL order records</td><td>8000; Inventory 8001, Payment 8002, PostgreSQL 5432</td></tr>
+        <tr><td><code>inventory-service</code></td><td>FastAPI stock API; Redis cache with 60-second TTL; simulated backing stock</td><td>8001; Redis 6379</td></tr>
+        <tr><td><code>payment-service</code></td><td>FastAPI charge API; simulated gateway and failure scenarios</td><td>8002</td></tr>
+        <tr><td><code>load-generator</code></td><td>Continuous normal, busy, degraded, payment-issue, and quiet traffic patterns</td><td>Internal calls to Order and Inventory</td></tr>
+        <tr><td><code>otel-collector</code></td><td>OTLP receive, resource tagging, batching, telemetry fan-out</td><td>4317/4318 ingest; 8889 Prometheus export; 8888 self metrics</td></tr>
+        <tr><td><code>tempo</code></td><td>Trace storage and query; service graph and span metrics generation</td><td>3200 HTTP; 4317 internal OTLP</td></tr>
+        <tr><td><code>prometheus</code></td><td>Metrics TSDB; scrapes Collector, services, and Tempo; remote-write receiver</td><td>9090</td></tr>
+        <tr><td><code>loki</code></td><td>Log storage and query; filesystem TSDB mode</td><td>3100</td></tr>
+        <tr><td><code>grafana</code></td><td>Dashboards and exploration with provisioned data sources</td><td>3000; Tempo, Prometheus, Loki</td></tr>
+        <tr><td><code>node-exporter</code></td><td>Host CPU, memory, disk, network metrics</td><td>9100 internal; host <code>/proc</code>, <code>/sys</code>, root filesystem</td></tr>
+        <tr><td><code>postgres</code></td><td>Demo order records; health check via <code>pg_isready</code></td><td>5432 internal</td></tr>
+        <tr><td><code>redis</code></td><td>Inventory stock cache</td><td>6379 internal</td></tr>
+      </tbody></table></div>
+    </section>
+
+    <section id="api">
+      <h2>7. API and UI contract (LLD)</h2>
+      <p>All AIOps routes are implemented by FastAPI and exposed to the browser under the portal's HTTPS <code>/api</code> prefix. Interactive OpenAPI documentation is available on the direct backend port at <code>:8080/docs</code>.</p>
+      <div class="table-wrap"><table><thead><tr><th>Method and route</th><th>Function</th><th>Key inputs / behavior</th></tr></thead><tbody>
+        <tr><td><code>GET /api/health</code></td><td>API and ClickHouse connectivity</td><td>Returns <code>api</code> and <code>clickhouse</code> status</td></tr>
+        <tr><td><code>GET /api/predictive/summary</code></td><td>Memory, load, and order-volume cards</td><td>Queries recent gauge values and root order spans</td></tr>
+        <tr><td><code>GET /api/predictive/memory</code></td><td>Available-memory forecast</td><td><code>hours_history=48</code>, <code>hours_ahead=24</code></td></tr>
+        <tr><td><code>GET /api/predictive/cpu</code></td><td>CPU-use forecast</td><td><code>hours_history=48</code>, <code>hours_ahead=24</code></td></tr>
+        <tr><td><code>GET /api/predictive/traffic</code></td><td>Order-volume forecast</td><td><code>hours_history=48</code>, <code>hours_ahead=12</code></td></tr>
+        <tr><td><code>GET /api/detective/anomalies</code></td><td>Multivariate anomaly timeline</td><td><code>hours=6</code>, <code>contamination=0.05</code></td></tr>
+        <tr><td><code>GET /api/detective/log-patterns</code></td><td>Log template groups and novelty</td><td><code>hours=2</code>, <code>limit=500</code></td></tr>
+        <tr><td><code>GET /api/detective/trace-shapes</code></td><td>Trace structure deviations</td><td>Time window <code>hours</code></td></tr>
+        <tr><td><code>GET /api/diagnostic/causal-graph</code></td><td>Service dependency graph and root-cause candidate</td><td><code>hours=1</code>; up to 5,000 spans</td></tr>
+        <tr><td><code>GET /api/diagnostic/correlate</code></td><td>Aligned slow traces, errors, logs, metrics</td><td><code>hours=1</code>; optional <code>service</code></td></tr>
+        <tr><td><code>POST /api/diagnostic/summarize</code></td><td>Gemini incident summary</td><td>JSON <code>{"hours":1,"service":""}</code></td></tr>
+        <tr><td><code>POST /api/chatbot/chat</code></td><td>Natural-language answer; optional SQL query</td><td>JSON <code>{"message":"…","history":[]}</code></td></tr>
+        <tr><td><code>GET /api/chatbot/suggestions</code></td><td>Suggested questions</td><td>No input</td></tr>
+      </tbody></table></div>
+      <h3>Demo service APIs</h3>
+      <p><code>POST /orders</code> orchestrates stock and payment; <code>GET /stock/{item_id}</code> and <code>GET /stock</code> expose inventory; <code>POST /charge</code> simulates payment. Each service exposes <code>/health</code> and <code>/metrics</code>. Demo controls include <code>DELETE /cache/{item_id}</code>, <code>GET /demo/scenarios</code>, and <code>GET /demo/failure-rate</code>.</p>
+      <h3>Frontend modules</h3>
+      <p>The portal has Predictive, Detective, Diagnostic, and Chat pages. React components call the matching API routes; <code>useHealthCheck</code> polls the health route. There is no browser-side database connection or Gemini key.</p>
+    </section>
+
+    <section id="analytics">
+      <h2>8. Analytics internals (LLD)</h2>
+      <div class="table-wrap"><table><thead><tr><th>Capability</th><th>Input and implementation</th><th>Output / limit</th></tr></thead><tbody>
+        <tr><td>Forecasting</td><td>ClickHouse 5-minute buckets → pandas → Prophet with daily/weekly seasonality and 95% interval</td><td>Historical points and <code>yhat</code> with lower/upper bounds; minimum 10 points</td></tr>
+        <tr><td>Multivariate anomalies</td><td>One-minute metric buckets; forward fill, standard scaling, Isolation Forest (100 estimators)</td><td>Window score, flag, contributing features; minimum two populated metrics and 20 windows</td></tr>
+        <tr><td>Log patterns</td><td>Recent and preceding-window logs parsed by Drain3 template miner</td><td>Template frequency, severity/services, examples, new-pattern flag</td></tr>
+        <tr><td>Trace shapes</td><td>Trace spans grouped by trace ID and parent/child relationships</td><td>Baseline shapes and structural deviations</td></tr>
+        <tr><td>Dependency graph</td><td>Parent span IDs joined to service names in recent traces</td><td>Service nodes, caller/callee edges, error and duration aggregates, heuristic root-cause candidate</td></tr>
+        <tr><td>Correlation</td><td>Root traces, error spans, error logs, and selected metric totals in one time window</td><td>Side-by-side JSON groups; trace IDs link evidence</td></tr>
+        <tr><td>Incident summary</td><td>Aggregated ClickHouse signals → Gemini prompt</td><td>Narrative symptoms, likely cause, impact, actions</td></tr>
+        <tr><td>Chat</td><td>Question + schema + last six turns → Gemini; extracted <code>SELECT</code> may run on ClickHouse</td><td>Natural-language answer, SQL, execution flag, tabular result</td></tr>
+      </tbody></table></div>
+      <div class="note warn"><strong>Interpretation rule.</strong> Forecasts and anomaly scores are computed from recent demo telemetry. Root-cause labels and Gemini summaries are heuristics or model output, not verified causal proof.</div>
+    </section>
+
+    <section id="data">
+      <h2>9. Data model, routing, and retention</h2>
+      <div class="table-wrap"><table><thead><tr><th>Store</th><th>Data and access</th><th>Retention / persistence</th></tr></thead><tbody>
+        <tr><td>ClickHouse <code>otel</code></td><td><code>otel_traces</code>, <code>otel_logs</code>, <code>otel_metrics_sum</code>, <code>otel_metrics_gauge</code>, <code>otel_metrics_histogram</code>; Collector writes, FastAPI reads</td><td>Collector ClickHouse exporter sets <code>ttl_days: 30</code>; external host manages underlying storage</td></tr>
+        <tr><td>Tempo</td><td>Trace blocks and WAL; Grafana queries trace IDs and service graph</td><td>48-hour block retention; preserved <code>grafana-otel-demo_tempo-data</code></td></tr>
+        <tr><td>Prometheus</td><td>Scraped service/Collector/Tempo metrics and Tempo-generated metrics</td><td>Preserved <code>grafana-otel-demo_prometheus-data</code>; no explicit TSDB retention setting in Compose</td></tr>
+        <tr><td>Loki</td><td>OTLP-derived logs via Loki exporter</td><td>Preserved <code>grafana-otel-demo_loki-data</code>; no explicit retention setting in config</td></tr>
+        <tr><td>Grafana</td><td>Users, dashboards, preferences; data-source and dashboard provisioning from files</td><td>Preserved <code>grafana-otel-demo_grafana-data</code></td></tr>
+        <tr><td>PostgreSQL</td><td>Confirmed demo orders</td><td>Image uses container/anonymous storage in this Compose definition; no named application volume</td></tr>
+        <tr><td>Redis</td><td>Stock cache entries</td><td>Cache TTL 60 seconds; no named volume in this Compose definition</td></tr>
+        <tr><td>Caddy</td><td>ACME account, certificates, runtime config</td><td><code>aiops_caddy-data</code> and <code>aiops_caddy-config</code></td></tr>
+      </tbody></table></div>
+      <h3>Telemetry routing matrix</h3>
+      <div class="table-wrap"><table><thead><tr><th>Signal</th><th>Source</th><th>Collector processors</th><th>Destinations</th></tr></thead><tbody>
+        <tr><td>Traces</td><td>Order, Inventory, Payment via OTLP</td><td>Resource tag + batch</td><td>Tempo, ClickHouse, debug log</td></tr>
+        <tr><td>Metrics</td><td>Services via OTLP; Node Exporter scraped at 15 s</td><td>Resource tag + batch</td><td>Collector Prometheus endpoint, ClickHouse, debug log</td></tr>
+        <tr><td>Logs</td><td>Services via OTLP</td><td>Resource tag + batch</td><td>Loki, ClickHouse, debug log</td></tr>
+      </tbody></table></div>
+      <p>Prometheus separately scrapes the Collector's metrics endpoint, each service's <code>/metrics</code>, and Tempo. Grafana data sources use internal service names and provisioned UIDs <code>tempo</code>, <code>prometheus</code>, and <code>loki</code>.</p>
+    </section>
+
+    <section id="security">
+      <h2>10. Security and trust boundaries</h2>
+      <div class="grid">
+        <div class="card"><div class="kicker">Implemented</div><h3>Transport and secrets</h3><p>Caddy terminates public TLS and redirects HTTP to HTTPS. ClickHouse credentials, Grafana admin bootstrap password, and Gemini key are supplied from an ignored <code>.env</code> file. Caddy stores ACME certificates in a persistent Docker volume.</p></div>
+        <div class="card"><div class="kicker">Current exposure</div><h3>Access control</h3><p>Grafana permits anonymous Viewer access. The portal and FastAPI have no application authentication. Legacy direct host ports remain published alongside the HTTPS names. Internal Compose traffic is HTTP/gRPC without TLS.</p></div>
+      </div>
+      <div class="note risk"><strong>Security review items before general use.</strong> The backend currently allows all CORS origins; some SQL statements interpolate request parameters directly, and chat checks only whether extracted SQL starts with <code>SELECT</code>. Gemini and HTML formatting should be treated as untrusted-output boundaries. Add authentication, authorization, strict query validation/parameterization, output escaping, rate limits, and network exposure controls before using this with sensitive or multi-tenant telemetry.</div>
+    </section>
+
+    <section id="operations">
+      <h2>11. Operations, health, and recovery</h2>
+      <div class="table-wrap"><table><thead><tr><th>Check</th><th>Expected result</th></tr></thead><tbody>
+        <tr><td><code>https://aiops.iohtechco.com/</code></td><td>Portal HTML, HTTPS certificate valid</td></tr>
+        <tr><td><code>https://aiops.iohtechco.com/api/health</code></td><td><code>{"api":"ok","clickhouse":"ok"}</code></td></tr>
+        <tr><td><code>https://grafana.aiops.iohtechco.com/api/health</code></td><td>Grafana JSON with <code>database: ok</code></td></tr>
+        <tr><td>Grafana dashboard UID <code>otel-demo-dashboard</code></td><td>Dashboard loads with recent service data</td></tr>
+        <tr><td>Prometheus <code>/-/ready</code>, Loki <code>/ready</code>, Tempo <code>/ready</code></td><td>HTTP 200 after startup/WAL recovery</td></tr>
+      </tbody></table></div>
+      <pre><code>docker compose -f compose.yaml -f compose.deployment.yaml ps
+docker compose -f compose.yaml -f compose.deployment.yaml logs --tail=100 proxy otel-collector aiops-backend
+docker compose -f compose.yaml -f compose.deployment.yaml up -d --no-build</code></pre>
+      <p>For this VM, both Compose files are required. Do not remove volumes during a restart. Caddy needs inbound 80/443 and persistent certificate storage for automated renewal. If ClickHouse is unavailable, the portal can load but analytics and health report database failure; Grafana's Tempo/Prometheus/Loki views can remain available independently.</p>
+    </section>
+
+    <section id="limits">
+      <h2>12. Constraints and next design steps</h2>
+      <ol>
+        <li><strong>Generic AIOps abstraction:</strong> replace fixed <code>otel</code> table names, metric names, and demo service identities with discoverable schemas and configured source adapters.</li>
+        <li><strong>Access model:</strong> introduce identity, tenant boundaries, read-only database credentials for analytics, and a constrained query service before wider rollout.</li>
+        <li><strong>Workload management:</strong> move long forecasting and AI tasks out of synchronous API requests if usage grows; add timeouts, queues, caching, and job status.</li>
+        <li><strong>Durability:</strong> formalize PostgreSQL/Redis persistence and backup policy if the demo transaction data becomes important.</li>
+        <li><strong>Deployment reproducibility:</strong> the current VM overlay reuses Python images built by the older projects. Build and publish versioned images from this repository for future hosts.</li>
+        <li><strong>Availability:</strong> the present deployment is one VM and one instance per service. It has no load-balanced failover or disaster-recovery automation.</li>
+      </ol>
+    </section>
+
+    <section id="sources">
+      <h2>13. Source map and verification basis</h2>
+      <div class="table-wrap"><table><thead><tr><th>Architecture element</th><th>Repository source</th></tr></thead><tbody>
+        <tr><td>Deployment, ports, networks, volumes</td><td><a href="../compose.yaml"><code>compose.yaml</code></a>, <a href="../compose.deployment.yaml"><code>compose.deployment.yaml</code></a>, <a href="../Caddyfile"><code>Caddyfile</code></a></td></tr>
+        <tr><td>Telemetry pipelines and stores</td><td><a href="../observability/otel-collector/config.yaml"><code>otel-collector/config.yaml</code></a>, <code>observability/grafana/*</code></td></tr>
+        <tr><td>Portal request routing</td><td><a href="../portal/frontend/nginx.conf"><code>frontend/nginx.conf</code></a>, <code>frontend/src/app/page.tsx</code></td></tr>
+        <tr><td>API routes and algorithms</td><td><a href="../portal/backend/main.py"><code>backend/main.py</code></a>, <code>backend/routers/*.py</code>, <a href="../portal/backend/db.py"><code>backend/db.py</code></a></td></tr>
+        <tr><td>Demo transaction behavior</td><td><code>observability/{order-service,inventory-service,payment-service,load-generator}/main.py</code></td></tr>
+      </tbody></table></div>
+      <p class="small">Prepared from repository configuration and implementation, with runtime verification of the deployed Compose project, public HTTPS endpoints, API/ClickHouse health, Grafana health, and certificate issuance. Host-specific external ClickHouse details and secret values are intentionally omitted.</p>
+    </section>
+    <div class="footer">AIOps Platform · Current-state architecture · HLD / LLD · 20 September 2026</div>
+  </main>
+</div>
+</body>
+</html>

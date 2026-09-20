@@ -2,6 +2,8 @@
 
 This repository combines the existing OpenTelemetry/Grafana demo and AIOps portal as a starting point for a later generic AIOps platform. The current portal still assumes the demo's ClickHouse `otel` schema and order-service metrics.
 
+The current-state architecture, high-level design, and low-level design are in [docs/architecture.html](docs/architecture.html). Open the file in a browser to view its diagrams and tables.
+
 ## Layout
 
 | Path | Purpose |
