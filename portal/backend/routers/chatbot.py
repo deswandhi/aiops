@@ -1,0 +1,247 @@
+import os
+import json
+import re
+import httpx
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from db import query_rows, get_clickhouse_schema
+
+router = APIRouter()
+
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+
+
+async def call_gemini(prompt: str, history: list[dict] = None, system: str = "") -> str:
+    """Call Gemini API passing a structured payload with system configuration and conversational history."""
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="GEMINI_API_KEY not set in .env."
+        )
+
+    contents = []
+    
+    # 1. Inject System Prompt Context natively matching Gemini instructions structure
+    if system:
+        contents.append({"role": "user", "parts": [{"text": system}]})
+        contents.append({"role": "model", "parts": [{"text": "Understood. I will follow those instructions."}]})
+    
+    # 2. Rehydrate structured conversation turns from conversational history
+    if history:
+        for turn in history:
+            # Map frontend 'assistant' role to Gemini's expected 'model' role
+            role = "model" if turn.get("role") == "assistant" else turn.get("role", "user")
+            contents.append({
+                "role": role,
+                "parts": [{"text": turn["content"]}]
+            })
+            
+    # 3. Append the active question turn
+    contents.append({"role": "user", "parts": [{"text": prompt}]})
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        response = await client.post(
+            f"{GEMINI_URL}?key={api_key}",
+            headers={"content-type": "application/json"},
+            json={
+                "contents": contents,
+                "generationConfig": {
+                    "temperature": 0.1,
+                    "maxOutputTokens": 1500,
+                }
+            }
+        )
+
+    if response.status_code != 200:
+        error_detail = f"Gemini API error: {response.status_code} — {response.text}"
+        print(error_detail, flush=True)  # Print to container stdout so user can see it in docker logs
+        raise HTTPException(
+            status_code=502,
+            detail=error_detail[:200]
+        )
+
+    result = response.json()
+    return result["candidates"][0]["content"]["parts"][0]["text"]
+
+
+def extract_sql(text: str) -> str | None:
+    """Extract SQL from a markdown code block or plain text, stripping any trailing semicolons."""
+    # Priority 1: SQL inside markdown code blocks
+    match = re.search(r"```(?:sql)?\s*(SELECT[\s\S]+?)```", text, re.IGNORECASE)
+    if match:
+        return match.group(1).strip().rstrip(';')
+        
+    # Priority 2: SELECT query ending with a semicolon
+    match = re.search(r"(SELECT[\s\S]+?;)", text, re.IGNORECASE)
+    if match:
+        return match.group(1).strip().rstrip(';')
+        
+    # Priority 3: Loose SELECT query to end of text
+    match = re.search(r"(SELECT[\s\S]+)", text, re.IGNORECASE)
+    if match:
+        return match.group(1).strip().rstrip(';')
+        
+    return None
+
+
+def format_results(rows: list[dict], limit: int = 50) -> str:
+    """Format query results as a readable HTML table."""
+    if not rows:
+        return "<em>Query returned no results.</em>"
+
+    rows = rows[:limit]
+    cols = list(rows[0].keys())
+
+    header = "".join(f"<th>{c}</th>" for c in cols)
+    body   = ""
+    for row in rows:
+        cells = "".join(
+            f"<td>{str(v)[:80] if v is not None else '—'}</td>"
+            for v in row.values()
+        )
+        body += f"<tr>{cells}</tr>"
+
+    return f"""
+<div style="overflow-x:auto;margin-top:0.5rem">
+<table style="width:100%;border-collapse:collapse;font-size:0.82rem;font-family:monospace">
+<thead><tr style="background:var(--surface2);font-family:var(--sans)">{header}</tr></thead>
+<tbody>{body}</tbody>
+</table>
+</div>
+<div style="font-size:0.75rem;color:var(--text-3);margin-top:0.4rem;font-family:var(--sans)">
+  Showing {len(rows)} row{'s' if len(rows) != 1 else ''}
+</div>"""
+
+
+def build_system_prompt() -> str:
+    return f"""You are an AIOps assistant with access to a ClickHouse database called `otel`.
+Your job is to help engineers query their observability data using natural language.
+
+{get_clickhouse_schema()}
+
+RULES:
+1. When the user asks a data question, respond with a valid ClickHouse SQL query inside a ```sql code block.
+2. Always use proper ClickHouse syntax (e.g. toStartOfInterval, quantile(), countIf()).
+3. Keep queries efficient — always include a time filter like: AND TimeUnix >= now() - INTERVAL 1 HOUR
+4. For duration fields in otel_traces, Duration is stored in nanoseconds. Divide by 1e6 for milliseconds.
+5. For p95 latency use: quantile(0.95)(Duration) / 1e6
+6. If the question is conversational, respond naturally without SQL.
+7. After providing SQL, briefly explain the technical logic of the query in 1-2 sentences (e.g. "This queries the highest node_load1 timestamp...").
+8. Never query more than 10000 rows. Always add LIMIT clauses.
+"""
+
+
+class ChatMessage(BaseModel):
+    role:    str
+    content: str
+
+class ChatRequest(BaseModel):
+    message: str
+    history: list[ChatMessage] = []
+
+
+@router.post("/chat")
+async def chat(req: ChatRequest):
+    system = build_system_prompt()
+
+    # Pass history as structured list (call_gemini handles formatting now)
+    history = [{"role": msg.role, "content": msg.content} for msg in req.history[-6:]]
+
+    # Step 1 — Generate SQL and Technical Explanation
+    gemini_response = await call_gemini(req.message, history=history, system=system)
+    sql = extract_sql(gemini_response)
+
+    if sql:
+        try:
+            clean = sql.strip().upper()
+            if not clean.startswith("SELECT"):
+                return {"response": gemini_response, "sql": sql, "executed": False}
+
+            # Execute SQL
+            rows  = query_rows(sql)
+            table = format_results(rows)
+
+            # Extract the technical explanation from the first response
+            tech_explanation = re.sub(r"```(?:sql)?[\s\S]+?```", "", gemini_response).strip()
+            if not tech_explanation:
+                tech_explanation = "SQL Query executed successfully."
+
+            # Step 2 — Generate Business Interpretation based on returned data
+            if rows:
+                safe_data_subset = [
+                    {key: str(value) for key, value in row.items()}
+                    for row in rows[:10]
+                ]
+                interp_prompt = f"""
+                                The user asked: "{req.message}"
+                                The database returned this data: {json.dumps(safe_data_subset)}
+
+                                Provide a concise, 1-2 sentence business-oriented interpretation of this data.
+                                Focus on what the numbers mean for the system's health or business.
+                                Do NOT explain the SQL query here. Just give the insight.
+                                """
+                try:
+                    business_interpretation = await call_gemini(interp_prompt)
+                except Exception:
+                    business_interpretation = "Data retrieved successfully."
+            else:
+                business_interpretation = "The query executed successfully, but no data matched the criteria for this timeframe."
+
+            response_html = f"""
+<div style="margin-bottom:1rem; font-size: 0.95rem; color: var(--text); font-weight: 500;">
+    {business_interpretation}
+</div>
+
+<details>
+  <summary style="cursor:pointer;font-size:0.78rem;color:var(--text-3);font-family:monospace;margin-bottom:0.4rem;outline:none;">
+    View SQL & Technical Details
+  </summary>
+  <div style="background:var(--surface2); padding:0.85rem; border-radius:8px; border:1px solid var(--border); margin-top:0.4rem;">
+      <div style="font-size:0.82rem; color:var(--text-2); margin-bottom:0.75rem; line-height: 1.5;">
+        <em>{tech_explanation}</em>
+      </div>
+      <pre style="background:#1e1e1e;color:#d4d4d4;padding:0.75rem;border-radius:6px;font-size:0.75rem;overflow-x:auto;margin:0;">{sql}</pre>
+  </div>
+</details>
+
+{table}"""
+
+            return {
+                "response": response_html,
+                "sql":      sql,
+                "executed": True,
+                "row_count": len(rows),
+            }
+
+        except Exception as e:
+            error_html = f"""
+<div style="margin-bottom:0.75rem">{gemini_response}</div>
+<div style="margin-top:0.75rem;padding:0.75rem;background:var(--red-bg);border-radius:6px;font-size:0.82rem;color:var(--red);border:1px solid rgba(235,0,140,0.2)">
+  <strong>Query execution failed:</strong><br>{str(e)[:200]}
+</div>"""
+            return {"response": error_html, "sql": sql, "executed": False, "error": str(e)}
+
+    # Pure conversation
+    return {"response": gemini_response, "sql": None, "executed": False}
+
+
+
+
+# ─────────────────────────────────────────────────────────────
+# SUGGESTED QUESTIONS (used to populate chatbot UI chips)
+# ─────────────────────────────────────────────────────────────
+@router.get("/suggestions")
+async def get_suggestions():
+    return {
+        "suggestions": [
+            "How many orders in the last hour?",
+            "Show payment failure rate by item",
+            "Which service had the most errors today?",
+            "What is the p95 order duration in ms?",
+            "Show node memory usage over the last 6 hours",
+            "Which trace had the highest latency today?",
+            "How many cache misses in the last 30 minutes?",
+            "Show error rate trend for payment-service",
+        ]
+    }
