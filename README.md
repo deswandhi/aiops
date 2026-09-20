@@ -23,6 +23,17 @@ The portal's nginx proxy sends browser `/api/` requests to the backend. ClickHou
 
 The nested Compose files are preserved as source references. Use the root `compose.yaml` for the combined stack. This copy contains no backend `.env` file or source Git metadata.
 
+## Existing host deployment
+
+The current VM uses `compose.deployment.yaml` with the root Compose file. It reuses the original Grafana, Tempo, Loki, Prometheus, and CmdStan volumes, and connects to the existing external ClickHouse database through values in the ignored `.env` file. It also names the existing Python images so the cutover does not depend on rebuilding their large dependency sets. The frontend image is built from `portal/frontend/` in this repo.
+
+```bash
+docker compose -f compose.yaml -f compose.deployment.yaml ps
+docker compose -f compose.yaml -f compose.deployment.yaml up -d --no-build
+```
+
+The standalone deployment uses `docker compose -f compose.yaml up --build -d` and its own local ClickHouse volume. Do not run both forms together on the same host because they publish the same ports.
+
 ## Source snapshots
 
 - `observability/` came from `/home/jonathan_jordy/grafana-otel-demo` at `003a74c1195ed8320ae90040470143854d505f98` (`main`, clean).

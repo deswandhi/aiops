@@ -1,0 +1,32 @@
+# Reuse the data from the two original Compose projects on this host.
+services:
+  clickhouse:
+    profiles: [local-db]
+
+  order-service:
+    image: grafana-otel-demo-order-service:latest
+  inventory-service:
+    image: grafana-otel-demo-inventory-service:latest
+  payment-service:
+    image: grafana-otel-demo-payment-service:latest
+  load-generator:
+    image: grafana-otel-demo-load-generator:latest
+  aiops-backend:
+    image: web-portal-for-grafana-otel-demo-aiops-backend:latest
+
+volumes:
+  tempo-data:
+    external: true
+    name: grafana-otel-demo_tempo-data
+  prometheus-data:
+    external: true
+    name: grafana-otel-demo_prometheus-data
+  loki-data:
+    external: true
+    name: grafana-otel-demo_loki-data
+  grafana-data:
+    external: true
+    name: grafana-otel-demo_grafana-data
+  cmdstan-cache:
+    external: true
+    name: web-portal-for-grafana-otel-demo_cmdstan-cache

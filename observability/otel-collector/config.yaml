@@ -42,7 +42,7 @@ exporters:
       job: true
 
   clickhouse:
-    endpoint: tcp://clickhouse:9000
+    endpoint: ${env:CLICKHOUSE_ENDPOINT}
     username: ${env:CLICKHOUSE_USER}
     password: ${env:CLICKHOUSE_PASSWORD}
     database: otel
